@@ -1,0 +1,183 @@
+/* Highstock Styles */
+
+/* Stock Tools GUI */
+.highcharts-stocktools-wrapper {
+  position: absolute;
+  z-index: 100;
+  top: 0;
+  right: 0;
+}
+
+.highcharts-stocktools-toolbar {
+  position: absolute;
+  z-index: 100;
+  top: 12px;
+  left: 12px;
+  background-color: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 5px;
+}
+
+.highcharts-menu-item {
+  padding: 0.5em 1em;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.highcharts-menu-item:hover {
+  background-color: #f0f0f0;
+}
+
+.highcharts-menu-item-btn {
+  width: 32px;
+  height: 32px;
+  margin: 3px;
+  padding: 4px;
+  cursor: pointer;
+  display: inline-block;
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 3px;
+}
+
+.highcharts-menu-item-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.highcharts-menu-item-btn.highcharts-active {
+  background-color: #e6f7ff;
+  border: 1px solid #1890ff;
+}
+
+/* Popups for annotations */
+.highcharts-popup {
+  position: absolute;
+  z-index: 100;
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 5px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  max-width: 350px;
+}
+
+.highcharts-popup-close {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  line-height: 20px;
+  border-radius: 50%;
+  color: #666;
+}
+
+.highcharts-popup-close:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.highcharts-popup input,
+.highcharts-popup select {
+  width: 100%;
+  margin: 5px 0;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.highcharts-popup-lhs-col,
+.highcharts-popup-rhs-col {
+  padding: 5px;
+}
+
+/* Button styles */
+.highcharts-popup-bottom-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.highcharts-popup-button {
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.2s;
+}
+
+.highcharts-popup-button.highcharts-popup-save {
+  background-color: #1890ff;
+  color: white;
+}
+
+.highcharts-popup-button.highcharts-popup-save:hover {
+  background-color: #40a9ff;
+}
+
+.highcharts-popup-button.highcharts-popup-cancel {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.highcharts-popup-button.highcharts-popup-cancel:hover {
+  background-color: #e0e0e0;
+}
+
+/* Drawing tools specific styles */
+.highcharts-draw-line {
+  background-image: url('https://code.highcharts.com/gfx/stocktools/series-types/line.svg');
+}
+
+.highcharts-measure-xy {
+  background-image: url('https://code.highcharts.com/gfx/stocktools/advanced/measure-xy.svg');
+}
+
+.highcharts-fibonacci {
+  background-image: url('https://code.highcharts.com/gfx/stocktools/advanced/fibonacci.svg');
+}
+
+.highcharts-toggle-annotations {
+  background-image: url('https://code.highcharts.com/gfx/stocktools/advanced/toggle-annotations.svg');
+}
+
+/* Custom styles for the TradingView-like component */
+.highstock-chart-container {
+  position: relative;
+  margin-bottom: 30px;
+}
+
+.ratio-control-panel {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ratio-label {
+  font-weight: 500;
+  margin-right: 10px;
+}
+
+.angle-display {
+  position: absolute;
+  z-index: 10;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: monospace;
+  top: 10px;
+  right: 10px;
+} 

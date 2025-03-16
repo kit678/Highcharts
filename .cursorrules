@@ -1,0 +1,38 @@
+# Prompt 1: Implement TradingView‑like Charting with Manual Drawing and Granular Price-to‑Bar Ratio Locking using Highstock
+
+## Objective
+Develop a Next.js chart component that replicates TradingView’s charting experience, with a strong focus on implementing a “price‑to‑bar” ratio locking feature that supports very granular values (e.g. 0.00369). Users should be able to manually draw lines (such as trendlines) on the chart—just like in TradingView—and the drawn shapes should preserve their geometry (angles and proportions) when zooming or panning.
+
+## Requirements
+
+1. **Data Loading and Rendering:**
+   - Load historical candlestick data and render a TradingView‑like chart.
+   - Use Highstock to build the chart, leveraging its built-in financial charting capabilities and native support for drawing tools (via the Stock Tools module).
+
+2. **Granular Price-to‑Bar Ratio Locking:**
+   - Implement a mechanism to lock the chart’s scale by maintaining a fixed constant `c` (e.g. 0.00369) that defines how many price units correspond to one bar (time unit).
+   - Ensure that when the chart is zoomed or panned, both the x‑axis (time) and y‑axis (price) scales update together to preserve the exact “price‑to‑bar” ratio, regardless of the granularity of `c`.
+   - Modify or extend Highstock’s behavior as needed to enforce this locking on both axes.
+
+3. **Manual Drawing Tools:**
+   - Leverage Highstock’s built-in Stock Tools module to provide an intuitive UI for manually drawing lines and other shapes on the chart, similar to TradingView’s drawing tools.
+   - Capture the start and end coordinates of a manually drawn line in data space.
+   - Calculate and display the angle of the drawn line, ensuring that this angle remains consistent when the scale is locked—even after zooming or panning.
+
+4. **TradingView Alignment and Testing:**
+   - Clearly document how the price-to‑bar ratio locking works so testers can:
+     - Lock the scale to a specific constant `c`
+     - Manually draw a line and verify that the angle matches what is observed on TradingView using the same constant.
+   - Provide a UI element to allow users to input or adjust the constant `c` for experimentation.
+
+5. **Next.js Integration:**
+   - Build the solution as a reusable Next.js component.
+   - Include clear instructions on how to integrate and use the component within an existing Next.js application.
+
+## Deliverables
+- Fully commented source code for the Next.js component using Highstock.
+- A README that explains:
+  - How to run and integrate the component.
+  - How to set the granular “price‑to‑bar” ratio.
+  - How to test the manual drawing tool and compare the drawn line’s angle with TradingView’s.
+- A demo page illustrating the scale locking and manual drawing functionality.

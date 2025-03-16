@@ -1,0 +1,96 @@
+name: Check Price Breaches
+
+on:
+  schedule:
+    # Run every 15 minutes during market hours (M-F, 9:30 AM - 4:00 PM ET)
+    - cron: '*/15 13-20 * * 1-5'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  check_breaches:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Check price breaches
+        run: |
+          python -c "
+import os
+import sys
+import json
+import requests
+import logging
+from datetime import datetime, time
+import pytz
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# API URL (replace with your deployed API URL)
+API_URL = os.environ.get('API_URL', 'http://localhost:8000')
+
+# Check if market is open (simple check, doesn't account for holidays)
+def is_market_open():
+    # Get current time in Eastern Time
+    eastern = pytz.timezone('US/Eastern')
+    now = datetime.now(eastern)
+    
+    # Check if it's a weekday
+    if now.weekday() >= 5:  # Saturday or Sunday
+        return False
+    
+    # Market hours: 9:30 AM to 4:00 PM Eastern Time
+    market_open = time(9, 30)
+    market_close = time(16, 0)
+    
+    current_time = now.time()
+    return market_open <= current_time <= market_close
+
+try:
+    # Check if market is open
+    if not is_market_open():
+        logger.info('Market is closed. Skipping breach check.')
+        sys.exit(0)
+    
+    # Check for breaches
+    response = requests.get(f'{API_URL}/api/breaches')
+    response.raise_for_status()
+    breaches = response.json()
+    
+    # Log the results
+    breached_tickers = []
+    
+    for ticker, breach_data in breaches.items():
+        if breach_data.get('breached_up') or breach_data.get('breached_down'):
+            breached_tickers.append(ticker)
+            logger.info(f'Price breach detected for {ticker}:')
+            logger.info(f'  Current price: {breach_data.get(\"current_price\")}')
+            logger.info(f'  Previous price: {breach_data.get(\"previous_price\")}')
+            logger.info(f'  Breached levels: {breach_data.get(\"breached_levels\")}')
+    
+    if breached_tickers:
+        logger.info(f'Detected breaches for {len(breached_tickers)} tickers: {breached_tickers}')
+    else:
+        logger.info('No price breaches detected')
+    
+except Exception as e:
+    logger.error(f'Error checking price breaches: {str(e)}')
+    sys.exit(1)
+          "
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }} 

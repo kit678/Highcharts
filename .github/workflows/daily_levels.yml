@@ -1,0 +1,77 @@
+name: Daily Gann Levels Calculation
+
+on:
+  schedule:
+    # Run every weekday at 8:00 AM UTC (before market open)
+    - cron: '0 8 * * 1-5'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  calculate_levels:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Calculate Gann levels
+        run: |
+          python -c "
+import os
+import sys
+import json
+import requests
+import logging
+from datetime import datetime
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# API URL (replace with your deployed API URL)
+API_URL = os.environ.get('API_URL', 'http://localhost:8000')
+
+try:
+    # Get all tickers
+    response = requests.get(f'{API_URL}/api/tickers')
+    response.raise_for_status()
+    tickers = response.json().get('tickers', [])
+    
+    if not tickers:
+        logger.warning('No tickers found')
+        sys.exit(0)
+    
+    logger.info(f'Found {len(tickers)} tickers')
+    
+    # Calculate levels for all tickers
+    response = requests.get(f'{API_URL}/api/levels', params={'recalculate': 'true'})
+    response.raise_for_status()
+    levels = response.json()
+    
+    # Log the results
+    for ticker, ticker_levels in levels.items():
+        if ticker_levels:
+            logger.info(f'{ticker}: Current price: {ticker_levels.get(\"price\")}, Up levels: {ticker_levels.get(\"up_levels\")}, Down levels: {ticker_levels.get(\"down_levels\")}')
+        else:
+            logger.warning(f'Failed to calculate levels for {ticker}')
+    
+    logger.info('Daily Gann levels calculation completed successfully')
+    
+except Exception as e:
+    logger.error(f'Error calculating Gann levels: {str(e)}')
+    sys.exit(1)
+          "
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }} 
