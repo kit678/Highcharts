@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST={"..\\utils\\highchartsInit.js -> highcharts/highstock":{"id":"..\\utils\\highchartsInit.js -> highcharts/highstock","files":["static/chunks/node_modules_highcharts_highstock_js.js"]}}
