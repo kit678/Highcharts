@@ -6,9 +6,12 @@ import { formatOHLCData, formatVolumeData, calculateYAxisRange } from './dataUti
 const buildChartOptions = (data, { 
   title = 'Price Chart', 
   priceToBarRatio = 1,
-  isRatioLocked = false,
+  isRatioLocked = true,
   onSetExtremes = null,
-  updateOHLCDisplay = null
+  updateOHLCDisplay = null,
+  showPivotPoints = true, // New option to show/hide pivot points
+  pivotLookback = 5,      // New option for pivot point sensitivity
+  pivotMethod = 'hlc'    // Add a new option: 'close' or 'hlc' (high-low-close)
 }) => {
   if (!data || data.length === 0) return null;
   
@@ -53,6 +56,20 @@ const buildChartOptions = (data, {
               setTimeout(() => onSetExtremes(xAxis, extremes), 100);
             } catch (error) {
               console.error("Error applying initial ratio:", error);
+            }
+          }
+          
+          // Initialize pivot points if enabled
+          if (showPivotPoints && this.Highcharts && this.Highcharts.createPivotPoints) {
+            try {
+              // Give time for series to render first
+              setTimeout(() => {
+                this.Highcharts.createPivotPoints(this, 'price-series', { 
+                  lookback: pivotLookback 
+                });
+              }, 200);
+            } catch (error) {
+              console.error("Error creating pivot points:", error);
             }
           }
           
@@ -297,7 +314,7 @@ const buildChartOptions = (data, {
       {
         type: 'candlestick',
         name: 'Price',
-        id: 'price_chart',
+        id: 'price-series', // Make sure this ID is consistent
         data: ohlcData,
         dataGrouping: { enabled: false },
         // Colors to match original appearance
@@ -310,11 +327,12 @@ const buildChartOptions = (data, {
       ...(volumeData.length > 0 ? [{
         type: 'column',
         name: 'Volume',
-        id: 'volume_chart',
+        id: 'volume-series',
         data: volumeData,
         yAxis: 1,
         color: 'rgba(100, 100, 255, 0.5)'
       }] : [])
+      // Note: Pivot points will be added dynamically via createPivotPoints function
     ]
   };
 };

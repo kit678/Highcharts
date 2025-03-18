@@ -110,6 +110,9 @@ const fetchStockData = async (ticker, interval, range) => {
 };
 
 const HighstockTradingViewPage = () => {
+  // Mark when we're on the server for proper rendering
+  const isServer = typeof window === 'undefined';
+  
   const [chartData, setChartData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -189,8 +192,12 @@ const HighstockTradingViewPage = () => {
       <Head>
         <title>TradingView-like Chart with Highstock | GannSq9</title>
         <meta name="description" content="Advanced charting with TradingView-like features, manual drawing, and price-to-bar ratio locking using Highstock" />
-        <link rel="stylesheet" type="text/css" href="https://code.highcharts.com/css/stocktools/gui.css" />
-        <link rel="stylesheet" type="text/css" href="https://code.highcharts.com/css/annotations/popup.css" />
+        {!isServer && (
+          <>
+            <link rel="stylesheet" type="text/css" href="https://code.highcharts.com/css/stocktools/gui.css" />
+            <link rel="stylesheet" type="text/css" href="https://code.highcharts.com/css/annotations/popup.css" />
+          </>
+        )}
       </Head>
       
       <PageContainer>
@@ -281,7 +288,7 @@ const HighstockTradingViewPage = () => {
           </div>
         ) : null}
         
-        {chartData && chartData.length > 0 && (
+        {!isServer && chartData && chartData.length > 0 && (
           <>
             <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
               <div className="p-4 border-b border-gray-200">

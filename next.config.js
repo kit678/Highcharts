@@ -13,7 +13,7 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     // Exclude TypeScript declaration files from bundling
     config.module.rules.push({
       test: /\.d\.ts$/,
@@ -24,6 +24,21 @@ const nextConfig = {
         },
       ],
     });
+
+    if (!isServer) {
+      // Fix issue with browser modules in server context
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+      };
+    }
+
+    // Critical fix: prevent Highcharts from loading during SSR
+    if (isServer) {
+      config.externals.push('highcharts', 'highcharts/highstock');
+    }
+
     return config;
   },
 };

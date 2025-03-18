@@ -3,71 +3,106 @@
  */
 import { formatOHLCData } from './dataUtils';
 import { updateOHLCDisplay } from './uiUtils';
+import { registerCustomIndicators } from './indicators';
 
-const initHighcharts = async () => {
-  if (typeof window === 'undefined') return null;
+// Global variable to track initialization
+let highchartsInstance = null;
+
+/**
+ * Initialize Highcharts with all required modules
+ * This function should only be called client-side
+ */
+export const initHighcharts = () => {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined') {
+    console.warn('Attempted to initialize Highcharts in a non-browser environment');
+    return null;
+  }
   
-  console.log("🔍 DEBUG: Starting Highcharts initialization");
-  try {
-    // Import core Highcharts/Highstock - using a direct import instead of dynamic
-    const Highcharts = await import('highcharts/highstock');
-    const highchartsInstance = Highcharts.default || Highcharts;
-    console.log("🔍 DEBUG: Core Highcharts loaded:", !!highchartsInstance);
-    
-    // Load required indicator modules
-    const loadIndicators = async () => {
-      try {
-        // Load indicators module (all-in-one approach instead of individual modules)
-        const stockIndicators = await import('highcharts/indicators/indicators');
-        if (stockIndicators.default) stockIndicators.default(highchartsInstance);
-        
-        // Now try to load export module for save/print functionality
-        try {
-          const exporting = await import('highcharts/modules/exporting');
-          if (exporting.default) exporting.default(highchartsInstance);
-          
-          console.log('✅ DEBUG: Exporting module loaded');
-        } catch (moduleError) {
-          console.warn('⚠️ DEBUG: Export module failed to load:', moduleError);
-          // Continue anyway as core functionality should work
-        }
-        
-        return true;
-      } catch (error) {
-        console.error('❌ DEBUG: Error loading modules:', error);
-        return false;
-      }
-    };
-    
-    // Load required modules
-    await loadIndicators();
-    
-    console.log('✅ DEBUG: All required Highcharts modules loaded successfully');
-    
+  // Return cached instance if already initialized
+  if (highchartsInstance) {
+    console.log('Returning existing Highcharts instance');
     return highchartsInstance;
+  }
+  
+  try {
+    console.log('Initializing Highcharts...');
+    
+    // Import Highcharts directly
+    // We need to use require here instead of import to avoid SSR issues
+    const Highcharts = require('highcharts/highstock');
+    
+    // Register custom indicators
+    registerCustomIndicators(Highcharts);
+    
+    // Initialize our own flags functionality since the module is causing issues
+    if (!Highcharts.seriesTypes.flags) {
+      // Add a basic implementation of the flags series type
+      Highcharts.seriesType('flags', 'column', {
+        // Default options
+        pointRange: 0,
+        shape: 'flag',
+        stackDistance: 12,
+        textAlign: 'center',
+        tooltip: {
+          pointFormat: '{point.text}<br/>'
+        },
+        threshold: null,
+        y: -30,
+        // Custom styling
+        fillColor: '#ffffff',
+        lineWidth: 1,
+        states: {
+          hover: {
+            brightness: 0.2,
+            fillColor: '#ccc'
+          }
+        },
+        style: {
+          fontSize: '11px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }
+      });
+      
+      console.log('✅ Custom flags implementation enabled');
+    }
+    
+    // Mark the Highcharts instance with a flag to indicate we've initialized everything
+    Highcharts.hasCustomIndicators = true;
+    
+    // Cache the instance
+    highchartsInstance = Highcharts;
+    
+    return Highcharts;
   } catch (error) {
-    console.error('❌ DEBUG: Failed to initialize Highcharts:', error);
+    console.error('❌ Error initializing Highcharts:', error);
     return null;
   }
 };
 
 /**
- * Create a basic chart for fallback when full Highcharts fails
+ * Fallback chart function in case Highcharts fails to load
  */
-const createBasicChart = (container, data) => {
-  const formattedData = formatOHLCData(data);
+export const createBasicChart = (container, data) => {
+  if (typeof window === 'undefined' || !container) return;
   
-  // Create a very basic chart without Highcharts
-  container.innerHTML = '<div style="padding: 20px; background: #f5f5f5; border-radius: 4px; text-align: center;">' +
-    '<p>Full charting library could not be loaded. Showing basic chart.</p>' +
-    '<canvas id="basic-chart" width="800" height="400"></canvas>' +
-    '</div>';
-  
-  return {
-    dataUpdated: () => {
-      console.log('Basic chart data updated');
-    }
-  };
-};
-
-export { initHighcharts, createBasicChart }; 
+  try {
+    const formattedData = formatOHLCData(data);
+    
+    // Create a simple message
+    container.innerHTML = `
+      <div style="padding: 20px; text-align: center;">
+        <h3 style="color: #d32f2f;">Advanced chart failed to load</h3>
+        <p>Using simplified display instead.</p>
+        <canvas id="basic-chart" width="800" height="400"></canvas>
+      </div>
+    `;
+    
+    // We could implement a basic canvas chart here if needed
+    console.log('Created basic chart fallback');
+  } catch (e) {
+    console.error('Failed to create basic chart:', e);
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #d32f2f;">Chart could not be displayed</div>';
+  }
+}; 
