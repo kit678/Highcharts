@@ -196,8 +196,8 @@ const HighstockTradingViewPage = () => {
       <PageContainer>
         <Title>TradingView-like Chart with Highstock</Title>
         <Description>
-          Advanced charting with drawing tools and granular price-to-bar ratio locking (e.g., 0.00369).
-          The drawn lines maintain their angles when zooming or panning.
+          Advanced charting with drawing tools, technical indicators, and granular price-to-bar ratio locking (e.g., 0.00369).
+          The drawn lines maintain their angles when zooming or panning. Custom pivot point detection and backtesting included.
         </Description>
         
         {/* Ticker Selection Form */}
@@ -292,7 +292,7 @@ const HighstockTradingViewPage = () => {
               <HighstockTradingViewChart 
                 data={chartData} 
                 title={chartTitle || `${ticker} Stock Price`}
-                initialPriceToBarRatio={0.00369}
+                initialPriceToBarRatio={1}
               />
             </div>
             
@@ -310,8 +310,8 @@ const HighstockTradingViewPage = () => {
                   By locking this ratio, the geometry of drawn shapes is preserved even when zooming or panning.
                 </p>
                 <p>
-                  In TradingView, this is equivalent to using their "lock scale" feature that maintains
-                  the visual relationship between price and time movements.
+                  The ratio is unlocked by default, allowing independent price and time scaling. You can lock it 
+                  using the lock button above the chart for consistent angle measurements.
                 </p>
               </div>
             </div>

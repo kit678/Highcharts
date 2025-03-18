@@ -5,8 +5,8 @@ import { formatOHLCData, formatVolumeData, calculateYAxisRange } from './dataUti
  */
 const buildChartOptions = (data, { 
   title = 'Price Chart', 
-  priceToBarRatio = 0.00369, 
-  isRatioLocked = true,
+  priceToBarRatio = 1,
+  isRatioLocked = false,
   onSetExtremes = null,
   updateOHLCDisplay = null
 }) => {
@@ -33,7 +33,11 @@ const buildChartOptions = (data, {
         enabled: true,
         type: 'xy'
       },
-      zoomType: null,
+      panKey: undefined,
+      zoomType: undefined,
+      marginBottom: 100,
+      spacingBottom: 20,
+      spacing: [10, 10, 20, 10], // [top, right, bottom, left]
       events: {
         load: function() {
           console.log("🔍 DEBUG: Chart load event triggered");
@@ -67,6 +71,39 @@ const buildChartOptions = (data, {
     rangeSelector: {
       enabled: true,
       selected: 1,
+      height: 40, // Explicit height
+      buttonPosition: {
+        align: 'center', // Center the buttons
+        x: 0,
+        y: 0
+      },
+      buttonTheme: {
+        width: 28,
+        height: 18,
+        padding: 2,
+        fill: '#f8f8f8',
+        stroke: '#cccccc',
+        'stroke-width': 1,
+        style: {
+          color: '#333333',
+          fontWeight: 'normal'
+        },
+        states: {
+          hover: {
+            fill: '#e6e6e6',
+            style: {
+              color: '#333333'
+            }
+          },
+          select: {
+            fill: '#e6e6e6',
+            style: {
+              color: '#333333',
+              fontWeight: 'bold'
+            }
+          }
+        }
+      },
       buttons: [{
         type: 'month',
         count: 1,
@@ -94,8 +131,33 @@ const buildChartOptions = (data, {
     },
     
     // Navigator and scrollbar
-    navigator: { enabled: true },
-    scrollbar: { enabled: true },
+    navigator: { 
+      enabled: true,
+      adaptToUpdatedData: true, // Ensure navigator updates with data
+      height: 50,
+      margin: 30, // Increased margin to avoid overlap
+      outlineWidth: 1,
+      maskFill: 'rgba(102, 133, 194, 0.2)',
+      handles: {
+        backgroundColor: '#f2f2f2',
+        borderColor: '#999'
+      }
+    },
+    scrollbar: { 
+      enabled: true,
+      margin: 8,
+      height: 8,
+      barBackgroundColor: '#cccccc',
+      barBorderRadius: 5,
+      barBorderWidth: 0,
+      buttonBackgroundColor: '#cccccc',
+      buttonBorderWidth: 0,
+      buttonBorderRadius: 5,
+      trackBackgroundColor: '#f2f2f2',
+      trackBorderWidth: 0,
+      trackBorderRadius: 5,
+      liveRedraw: false // Disable live redraw for better performance
+    },
     
     // Chart title
     title: { text: title },
@@ -123,6 +185,17 @@ const buildChartOptions = (data, {
         borderWidth: 1,
         dataGrouping: {
           enabled: false
+        },
+        clip: false,  // Allow rendering outside the plot area to prevent cutoff
+        events: {
+          // Ensure proper data rendering
+          afterAnimate: function() {
+            if (this.chart && this.chart.redraw) {
+              setTimeout(() => {
+                this.chart.redraw(false);
+              }, 100);
+            }
+          }
         }
       }
     },
@@ -149,7 +222,15 @@ const buildChartOptions = (data, {
     xAxis: {
       ordinal: false,      // Important - disable ordinal axis to preserve time scale
       minRange: 24 * 3600 * 1000,
-      overscroll: 0.5,
+      overscroll: 2,       // Increase overscroll for more space to the right
+      min: null,           // Allow panning beyond the first point
+      max: null,           // Allow panning beyond the last point 
+      maxPadding: 0.3,     // Add more padding to the right
+      minPadding: 0.05,    // Add some padding to the left
+      lineWidth: 1,
+      tickLength: 5,
+      margin: 15, // Increased margin for labels
+      offset: 5,  // Offset from the edge
       events: {
         afterSetExtremes: function(e) {
           console.log("X-axis extremes changed:", e.min, e.max);
@@ -170,17 +251,20 @@ const buildChartOptions = (data, {
     // Y-axis configuration
     yAxis: [{
       // Price axis
-      min: yAxisConfig.min,
-      max: yAxisConfig.max,
+      min: null,           // Allow panning below the lowest price
+      max: null,           // Allow panning above the highest price
       startOnTick: false,
       endOnTick: false,
-      minPadding: 0.1,
-      maxPadding: 0.1,
+      minPadding: 0.2,     // Increase padding below
+      maxPadding: 0.2,     // Increase padding above
       labels: { align: 'right', x: -3 },
       title: { text: 'Price' },
-      height: '60%',
+      height: '65%', // Increase height slightly
       lineWidth: 2,
       resize: { enabled: true },
+      softMin: yAxisConfig.min,  // Soft minimum for initial view
+      softMax: yAxisConfig.max,  // Soft maximum for initial view
+      showEmpty: false,
       events: {
         afterSetExtremes: function(e) {
           console.log("Y-axis extremes changed:", e.min, e.max);
@@ -196,14 +280,20 @@ const buildChartOptions = (data, {
       // Volume axis
       labels: { align: 'right', x: -3 },
       title: { text: 'Volume' },
-      top: '65%',
-      height: '35%',
+      top: '70%', // Move down slightly
+      height: '30%', // Decrease height slightly
       offset: 0,
-      lineWidth: 2
+      lineWidth: 2,
+      min: null,          // Allow panning below the lowest volume
+      max: null,          // Allow panning above the highest volume
+      minPadding: 0.2,    // Add padding below
+      maxPadding: 0.2,    // Add padding above
+      showEmpty: false
     }],
     
     // Series data
     series: [
+      // Main price series
       {
         type: 'candlestick',
         name: 'Price',

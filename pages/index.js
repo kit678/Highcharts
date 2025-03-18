@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { FaPlus, FaSpinner, FaSyncAlt, FaChartLine } from 'react-icons/fa';
+import { FaPlus, FaSpinner, FaSyncAlt, FaChartLine, FaRuler } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
 import TickerCard from '../components/TickerCard';
@@ -38,6 +38,12 @@ export default function Home() {
             </p>
           </div>
           <div className="header-actions">
+            <Link href="/tradingview-chart-tester">
+              <a className="chart-btn">
+                <FaRuler className="icon" />
+                <span>Chart Tester</span>
+              </a>
+            </Link>
             <Link href="/ChartDemo">
               <a className="chart-btn">
                 <FaChartLine className="icon" />

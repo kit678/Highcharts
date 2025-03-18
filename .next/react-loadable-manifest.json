@@ -4,5 +4,17 @@
     "files": [
       "static/chunks/node_modules_highcharts_highstock_js.js"
     ]
+  },
+  "..\\utils\\highchartsInit.js -> highcharts/indicators/indicators": {
+    "id": "..\\utils\\highchartsInit.js -> highcharts/indicators/indicators",
+    "files": [
+      "static/chunks/node_modules_highcharts_indicators_indicators_js.js"
+    ]
+  },
+  "..\\utils\\highchartsInit.js -> highcharts/modules/exporting": {
+    "id": "..\\utils\\highchartsInit.js -> highcharts/modules/exporting",
+    "files": [
+      "static/chunks/node_modules_highcharts_modules_exporting_js.js"
+    ]
   }
 }

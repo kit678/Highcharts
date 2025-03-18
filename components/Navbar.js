@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FaSun, FaChartLine, FaPlus, FaBars, FaTimes, FaChartBar } from 'react-icons/fa';
+import { FaSun, FaChartLine, FaPlus, FaBars, FaTimes, FaChartBar, FaFlask, FaRuler } from 'react-icons/fa';
 import { useAppContext } from '../contexts/AppContext';
 
 const Navbar = () => {
@@ -57,6 +57,22 @@ const Navbar = () => {
               <a className={router.pathname === '/highstock-tradingview' ? 'active' : ''}>
                 <FaChartBar className="icon" />
                 Highstock Chart
+              </a>
+            </Link>
+          </li>
+          <li>
+            <Link href="/backtest">
+              <a className={router.pathname === '/backtest' ? 'active' : ''}>
+                <FaFlask className="icon" />
+                Backtesting
+              </a>
+            </Link>
+          </li>
+          <li>
+            <Link href="/tradingview-chart-tester">
+              <a className={router.pathname === '/tradingview-chart-tester' ? 'active' : ''}>
+                <FaRuler className="icon" />
+                Chart Tester
               </a>
             </Link>
           </li>

@@ -14,87 +14,60 @@ const initHighcharts = async () => {
     const highchartsInstance = Highcharts.default || Highcharts;
     console.log("🔍 DEBUG: Core Highcharts loaded:", !!highchartsInstance);
     
-    // Set global options with proper zooming/panning
-    highchartsInstance.setOptions({
-      accessibility: { enabled: true },
-      credits: { enabled: false },
-      chart: {
-        panning: {
-          enabled: true,
-          type: 'xy'
-        },
-        zoomType: null // Disable rectangular zoom
+    // Load required indicator modules
+    const loadIndicators = async () => {
+      try {
+        // Load indicators module (all-in-one approach instead of individual modules)
+        const stockIndicators = await import('highcharts/indicators/indicators');
+        if (stockIndicators.default) stockIndicators.default(highchartsInstance);
+        
+        // Now try to load export module for save/print functionality
+        try {
+          const exporting = await import('highcharts/modules/exporting');
+          if (exporting.default) exporting.default(highchartsInstance);
+          
+          console.log('✅ DEBUG: Exporting module loaded');
+        } catch (moduleError) {
+          console.warn('⚠️ DEBUG: Export module failed to load:', moduleError);
+          // Continue anyway as core functionality should work
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('❌ DEBUG: Error loading modules:', error);
+        return false;
       }
-    });
+    };
     
-    console.log('✅ DEBUG: Successfully initialized Highcharts core');
+    // Load required modules
+    await loadIndicators();
+    
+    console.log('✅ DEBUG: All required Highcharts modules loaded successfully');
     
     return highchartsInstance;
   } catch (error) {
-    console.error('❌ DEBUG: Error initializing Highcharts:', error);
+    console.error('❌ DEBUG: Failed to initialize Highcharts:', error);
     return null;
   }
 };
 
 /**
- * Create a basic chart when full functionality isn't available
+ * Create a basic chart for fallback when full Highcharts fails
  */
-const createBasicChart = async (container, data) => {
-  if (typeof window === 'undefined' || !container || !data || data.length === 0) return null;
+const createBasicChart = (container, data) => {
+  const formattedData = formatOHLCData(data);
   
-  try {
-    const HighchartsModule = await import('highcharts/highstock');
-    const Highcharts = HighchartsModule.default || HighchartsModule;
-    
-    // Process data for chart
-    const ohlcData = formatOHLCData(data);
-    
-    return Highcharts.stockChart(container, {
-      chart: {
-        animation: false,
-        height: 600,
-        panning: {
-          enabled: true,
-          type: 'xy'
-        },
-        zoomType: null, // Disable rectangular zoom
-        events: {
-          mousemove: function(e) {
-            const point = this.series[0].searchPoint(e, true);
-            if (point) updateOHLCDisplay(point, container);
-          }
-        }
-      },
-      series: [{
-        type: 'candlestick',
-        data: ohlcData,
-        name: 'Price',
-        dataGrouping: { enabled: false },
-        // Restore original colors
-        color: '#2f7ed8',      // Down candle
-        upColor: 'white',      // Up candle 
-        lineColor: '#2f7ed8',  // Down candle border
-        upLineColor: '#2f7ed8' // Up candle border
-      }],
-      xAxis: {
-        ordinal: false,
-        minRange: 24 * 3600 * 1000, // Minimum range of 1 day
-        overscroll: 0.5             // Allow overscroll beyond data points
-      },
-      yAxis: {
-        startOnTick: false,
-        endOnTick: false
-      },
-      tooltip: { enabled: false },
-      rangeSelector: { enabled: false },
-      navigator: { enabled: false },
-      scrollbar: { enabled: false },
-      credits: { enabled: false }
-    });
-  } catch (error) {
-    console.error('Error creating basic chart:', error);
-    return null;
-  }
+  // Create a very basic chart without Highcharts
+  container.innerHTML = '<div style="padding: 20px; background: #f5f5f5; border-radius: 4px; text-align: center;">' +
+    '<p>Full charting library could not be loaded. Showing basic chart.</p>' +
+    '<canvas id="basic-chart" width="800" height="400"></canvas>' +
+    '</div>';
+  
+  return {
+    dataUpdated: () => {
+      console.log('Basic chart data updated');
+    }
+  };
 };
 
 export { initHighcharts, createBasicChart }; 

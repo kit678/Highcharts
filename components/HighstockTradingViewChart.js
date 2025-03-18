@@ -9,23 +9,22 @@ import { updateOHLCDisplay, calculateAngle } from '../utils/uiUtils';
 import { buildChartOptions } from '../utils/chartOptionsBuilder';
 
 /**
- * A TradingView-like chart component using Highstock with drawing tools and price-to-bar ratio locking
+ * A TradingView-like chart component with price-to-bar ratio locking
  * 
  * This component renders a financial chart with:
- * - Manual drawing tools (via Stock Tools module)
  * - Ability to lock price-to-bar ratio (aspect ratio) to maintain angle consistency
  * - OHLC/Candlestick data visualization
  */
 const HighstockTradingViewChart = ({ 
   data = [], 
   title = 'Price Chart',
-  initialPriceToBarRatio = 0.00369, // Default ratio as per requirements
+  initialPriceToBarRatio = 1, // Changed from 0.00369 to 1
 }) => {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
   const [priceToBarRatio, setPriceToBarRatio] = useState(initialPriceToBarRatio);
   const [priceToBarRatioText, setPriceToBarRatioText] = useState(initialPriceToBarRatio.toString());
-  const [isRatioLocked, setIsRatioLocked] = useState(true);
+  const [isRatioLocked, setIsRatioLocked] = useState(false); // Changed from true to false
   const [highcharts, setHighcharts] = useState(null);
 
   // Initialize Highcharts on client-side only
@@ -435,7 +434,7 @@ const HighstockTradingViewChart = ({
             {isRatioLocked ? '🔒 Locked' : '🔓 Unlocked'}
           </button>
           <div className="ratio-info">
-            <small>Try values between 0.001 and 0.1 for best results</small>
+            <small>Try values between 0.1 and 10 for best results</small>
           </div>
         </div>
         
@@ -535,12 +534,27 @@ const HighstockTradingViewChart = ({
           position: relative;
           width: 100%;
           height: 600px;
+          margin-bottom: 40px; /* Add margin to ensure navigator and scrollbar have space */
         }
         
         .chart-container {
           width: 100%;
           height: 100%;
           position: relative;
+          overflow: visible; /* Ensure chart elements outside container are visible */
+        }
+        
+        /* Override Highcharts-specific styles to fix spacing issues */
+        :global(.highcharts-container) {
+          overflow: visible !important;
+        }
+        
+        :global(.highcharts-navigator-series) {
+          fill-opacity: 0.3;
+        }
+        
+        :global(.highcharts-scrollbar) {
+          margin-top: 10px;
         }
       `}</style>
     </div>
