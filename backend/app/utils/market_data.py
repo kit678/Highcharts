@@ -149,95 +149,109 @@ def get_historical_data(
     ticker: str, 
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    period: str = "1y"
+    period: str = "1y",
+    interval: str = "1d"  # Add interval parameter
 ) -> pd.DataFrame:
     """
-    Get historical price data for a ticker symbol.
+    Fetch historical market data from Yahoo Finance.
     
     Args:
-        ticker: The ticker symbol
-        start_date: Start date for the data (optional)
-        end_date: End date for the data (optional)
-        period: The time period to fetch data for (used if start_date is None)
-        
-    Returns:
-        DataFrame: Historical price data
-        
-    Raises:
-        ValueError: If ticker is invalid or if no data is available
-        RuntimeError: If there are network issues or other runtime errors
-    """
-    max_retries = 3
-    retry_delay = 2  # seconds
-    last_exception = None
+        ticker: The stock ticker symbol
+        start_date: Start date for data retrieval
+        end_date: End date for data retrieval
+        period: Time period for data (e.g. '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', 'max')
+        interval: Data interval (e.g. '1m', '5m', '15m', '30m', '1h', '1d', '1wk', '1mo')
     
-    for attempt in range(max_retries):
+    Returns:
+        DataFrame containing historical price data
+    
+    Raises:
+        ValueError: If the ticker doesn't exist or data cannot be retrieved
+    """
+    logger.info(f"Fetching historical data for {ticker} with interval={interval}, period={period}")
+    
+    if not ticker:
+        raise ValueError("Ticker symbol is required")
+    
+    # Add retry logic
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
         try:
             # Configure a session with browser-like headers
             session = requests.Session()
             session.headers.update({
                 'User-Agent': random.choice(USER_AGENTS),
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5'
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
             })
             
-            # Add a delay to avoid rate limits
-            time.sleep(1)
+            # Add a delay to avoid rate limits (increase delay with each retry)
+            time.sleep(1 * (retry_count + 1))
             
             if start_date and end_date:
                 # Format dates as strings
                 start_str = start_date.strftime('%Y-%m-%d')
                 end_str = end_date.strftime('%Y-%m-%d')
                 
-                # Fetch the historical data
+                # Fetch the historical data WITH interval parameter
                 hist_data = yf.download(
                     ticker, 
                     start=start_str, 
                     end=end_str,
+                    interval=interval,  # Use interval parameter
                     progress=False,
                     session=session
                 )
             else:
-                # Use the period parameter
+                # Use the period parameter WITH interval
                 hist_data = yf.download(
                     ticker, 
                     period=period,
+                    interval=interval,  # Use interval parameter
                     progress=False,
                     session=session
                 )
             
             # Verify we actually got data
             if hist_data is None or hist_data.empty:
-                raise ValueError(f"No historical data available for {ticker} with period {period}")
+                retry_count += 1
+                logger.warning(f"Attempt {retry_count}/{max_retries}: No data for {ticker} (interval={interval}, period={period})")
+                if retry_count >= max_retries:
+                    raise ValueError(f"No historical data available for {ticker} with interval={interval} and period={period}")
+                continue
                 
             # Verify the data has the expected columns
             required_columns = ["Open", "High", "Low", "Close"]
             missing_columns = [col for col in required_columns if col not in hist_data.columns]
             if missing_columns:
-                raise ValueError(f"Data missing required columns: {', '.join(missing_columns)}")
-                
-            # Warn if there are unusually few data points
-            min_expected_points = 5  # Arbitrary minimum for sanity check
-            if len(hist_data) < min_expected_points:
-                logger.warning(f"Very few data points ({len(hist_data)}) returned for {ticker}")
-                
+                retry_count += 1
+                logger.warning(f"Attempt {retry_count}/{max_retries}: Missing columns {missing_columns}")
+                if retry_count >= max_retries:
+                    raise ValueError(f"Data missing required columns: {', '.join(missing_columns)}")
+                continue
+            
+            # Log success and return the data
+            logger.info(f"Successfully retrieved {len(hist_data)} data points for {ticker}")
             return hist_data
             
         except Exception as e:
-            logger.error(f"Error fetching historical data for {ticker} (attempt {attempt+1}/{max_retries}): {str(e)}")
-            last_exception = e
+            retry_count += 1
+            logger.warning(f"Attempt {retry_count}/{max_retries}: Error fetching data: {str(e)}")
             
-            if attempt < max_retries - 1:
-                retry_delay *= 2
-                time.sleep(retry_delay)
+            if retry_count >= max_retries:
+                logger.error(f"All {max_retries} attempts failed for {ticker}")
+                # Don't fall back to demo data - raise the error
+                raise ValueError(f"Failed to fetch data for {ticker} after {max_retries} attempts: {str(e)}") from e
+            
+            # Add exponential backoff delay before retry
+            time.sleep(2 ** retry_count)
     
-    # If we've tried all retries and still failed, raise a clear error
-    error_message = f"Failed to fetch historical data for {ticker} after {max_retries} attempts"
-    if last_exception:
-        error_message += f": {str(last_exception)}"
-        
-    logger.error(error_message)
-    raise RuntimeError(error_message)
+    # This should never be reached due to the exception in the loop
+    raise ValueError(f"Unexpected error fetching data for {ticker}")
 
 def is_market_open() -> bool:
     """

@@ -348,7 +348,7 @@ async def get_ticker_history(
     
     Parameters:
     - ticker: Stock symbol to fetch data for
-    - interval: Data interval ('1d', '1wk', '1mo')
+    - interval: Data interval ('1m', '5m', '15m', '30m', '1h', '1d', '1wk', '1mo')
     - range: Historical range ('1mo', '3mo', '6mo', '1y', '5y', 'max')
     
     Returns:
@@ -357,29 +357,35 @@ async def get_ticker_history(
     ticker = ticker.upper()
     
     try:
-        # Use the get_historical_data function that's available
-        market_data = get_historical_data(ticker, period=range)
+        # Pass both interval and period parameters
+        market_data = get_historical_data(ticker, period=range, interval=interval)
         
         if market_data is None or market_data.empty:
             raise HTTPException(
                 status_code=404,
-                detail=f"No market data available for {ticker}"
+                detail=f"No market data available for {ticker} with interval={interval} and range={range}"
             )
         
-        # Convert pandas DataFrame to a list of dictionaries in the format expected by TradingViewLightweightChart
+        # Convert pandas DataFrame to a list of dictionaries
         result = []
         
         # Ensure the data is sorted by date
         market_data = market_data.sort_index()
         
-        # Remove any duplicate dates (this is important for TradingView Lightweight Charts)
+        # Remove any duplicate dates
         market_data = market_data[~market_data.index.duplicated(keep='first')]
         
         for index, row in market_data.iterrows():
             # Make sure we have all required fields
             if all(field in row for field in ["Open", "High", "Low", "Close"]):
+                # Format date based on interval (use datetime for intraday data)
+                if interval in ['1m', '5m', '15m', '30m', '1h', '2h', '4h']:
+                    date_str = index.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    date_str = index.strftime("%Y-%m-%d")
+                
                 result.append({
-                    "date": index.strftime("%Y-%m-%d"),
+                    "date": date_str,
                     "open": float(row["Open"]),
                     "high": float(row["High"]),
                     "low": float(row["Low"]),
@@ -396,13 +402,31 @@ async def get_ticker_history(
                 seen_dates.add(item["date"])
                 unique_result.append(item)
                 
-        # Sort by date ascending (important for TradingView Lightweight Charts)
+        # Sort by date ascending
         unique_result.sort(key=lambda x: x["date"])
         
+        # Add validation for data quality
+        if len(unique_result) < 1:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No valid data points available for {ticker} with interval={interval} and range={range}"
+            )
+            
+        logger.info(f"Returning {len(unique_result)} data points for {ticker} with interval={interval}")
         return unique_result
+            
+    except ValueError as e:
+        # Catch specific ValueError exceptions and return as 404
+        logger.error(f"ValueError fetching historical data for {ticker}: {str(e)}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error fetching market data: {str(e)}"
+        )
     except Exception as e:
+        # Log the detailed error
         logger.error(f"Error fetching historical data for {ticker}: {str(e)}")
+        # Return a generic 500 error
         raise HTTPException(
             status_code=500,
-            detail=f"Error fetching market data: {str(e)}"
+            detail=f"Server error fetching market data"
         ) 

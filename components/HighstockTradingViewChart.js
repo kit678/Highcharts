@@ -7,6 +7,7 @@ import { initHighcharts, createBasicChart } from '../utils/highchartsInit';
 import { formatOHLCData, calculateBarTimeLength } from '../utils/dataUtils';
 import { updateOHLCDisplay, calculateAngle } from '../utils/uiUtils';
 import { buildChartOptions } from '../utils/chartOptionsBuilder';
+import { calculateAngleBetweenPoints } from '../utils/indicators';
 
 /**
  * A TradingView-like chart component with price-to-bar ratio locking
@@ -14,31 +15,35 @@ import { buildChartOptions } from '../utils/chartOptionsBuilder';
  * This component renders a financial chart with:
  * - Ability to lock price-to-bar ratio (aspect ratio) to maintain angle consistency
  * - OHLC/Candlestick data visualization
- * - Pivot point detection
+ * - Manual drawing tools (trendlines, etc.)
+ * - Angle measurement for drawn lines
  */
 const HighstockTradingViewChart = ({ 
   data = [], 
   title = 'Price Chart',
-  initialPriceToBarRatio = 1, // Changed from 0.00369 to 1
+  initialPriceToBarRatio = 0.00369, // Default TradingView-like ratio
 }) => {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
   const [priceToBarRatio, setPriceToBarRatio] = useState(initialPriceToBarRatio);
   const [priceToBarRatioText, setPriceToBarRatioText] = useState(initialPriceToBarRatio.toString());
-  const [isRatioLocked, setIsRatioLocked] = useState(false); // Changed from true to false
+  const [isRatioLocked, setIsRatioLocked] = useState(true); // Default to locked
   const [highcharts, setHighcharts] = useState(null);
-  const [showPivotPoints, setShowPivotPoints] = useState(true);
+  const [showPivotPoints, setShowPivotPoints] = useState(false); // Default to not showing pivots
   const [pivotLookback, setPivotLookback] = useState(5);
   const [pivotLookbackText, setPivotLookbackText] = useState('5');
   const [error, setError] = useState(null);
   const [pivotMethod, setPivotMethod] = useState('hlc'); // Default to high-low pivot detection
+  const [drawingEnabled, setDrawingEnabled] = useState(false);
+  const [currentDrawingTool, setCurrentDrawingTool] = useState(null);
+  const [drawnShapes, setDrawnShapes] = useState([]);
 
   // Initialize Highcharts on client-side only
   useEffect(() => {
     // Only run in browser
     if (typeof window === 'undefined') return;
     
-    console.log("Starting Highcharts initialization");
+      console.log("Starting Highcharts initialization");
     
     // Use setTimeout to ensure the DOM is fully loaded
     setTimeout(() => {
@@ -79,27 +84,13 @@ const HighstockTradingViewChart = ({
       // Calculate bar time length and bars in view
       const { barTimeLength, barsInView } = calculateBarTimeLength(series, xAxis);
       
-      // Add debug logging
-      console.log("🔍 DEBUG: Ratio lock calculations:", {
-        priceToBarRatio,
-        xRange,
-        barTimeLength,
-        barsInView: barsInView || 'N/A',
-        sourceTrigger: e?.trigger || 'unknown'
-      });
-      
       if (barsInView <= 0) {
         // Fallback to visible points count if barsInView calculation failed
         const allPoints = series.points || [];
         const visiblePoints = allPoints.filter(p => p.x >= xAxis.min && p.x <= xAxis.max);
         const pointsCount = Math.max(1, visiblePoints.length);
         
-        console.log("🔍 DEBUG: Using visible points fallback:", {
-          visiblePoints: pointsCount,
-          allPoints: allPoints.length
-        });
-        
-        // Get price values (not timestamps) from the visible points
+        // Get price values from the visible points
         let minPrice = Infinity, maxPrice = -Infinity;
         visiblePoints.forEach(point => {
           minPrice = Math.min(minPrice, point.low || point.y || 0);
@@ -109,18 +100,9 @@ const HighstockTradingViewChart = ({
         // Use actual price range instead of timestamp values
         const actualPriceRange = maxPrice - minPrice;
         const desiredPriceRange = priceToBarRatio * pointsCount;
-        const pricePadding = (desiredPriceRange - actualPriceRange) / 2;
         
         // Calculate the center of the price range
         const priceCenter = (minPrice + maxPrice) / 2;
-        
-        console.log("🔍 DEBUG: Price calculation:", {
-          minPrice,
-          maxPrice, 
-          actualPriceRange,
-          desiredPriceRange,
-          priceCenter
-        });
         
         // Avoid setting extremes with identical values to reduce recursion
         if (
@@ -137,16 +119,6 @@ const HighstockTradingViewChart = ({
               false, // animation
               { syncYAxis: true } // Add flag to prevent recursion
             );
-            
-            console.log("✅ DEBUG: Applied ratio lock to Y-axis:", {
-              newMin: priceCenter - desiredPriceRange / 2,
-              newMax: priceCenter + desiredPriceRange / 2,
-              desiredPriceRange
-            });
-          } else if (!axis.isXAxis && !e.syncXAxis && e.trigger !== 'syncExtremes') {
-            // Handle Y-axis changes by adjusting X-axis if needed
-            // This would only happen if user directly manipulates Y-axis
-            // Implementation depends on desired behavior - often not needed
           }
         }
         
@@ -168,13 +140,6 @@ const HighstockTradingViewChart = ({
       // Use price center from actual data, not from timestamps
       const priceCenter = (minPrice + maxPrice) / 2;
       
-      console.log("🔍 DEBUG: Price calculation for primary path:", {
-        minPrice,
-        maxPrice,
-        priceCenter,
-        desiredPriceRange: priceRange
-      });
-      
       // Avoid setting extremes with identical values to reduce recursion
       if (
         Math.abs(yAxis.min - (priceCenter - priceRange / 2)) > 0.0001 ||
@@ -190,20 +155,40 @@ const HighstockTradingViewChart = ({
             false, // animation
             { syncYAxis: true } // Add flag to prevent recursion
           );
-          
-          console.log("✅ DEBUG: Applied ratio lock to Y-axis:", {
-            newMin: priceCenter - priceRange / 2,
-            newMax: priceCenter + priceRange / 2,
-            priceRange
-          });
-        } else if (!axis.isXAxis && !e.syncXAxis && e.trigger !== 'syncExtremes') {
-          // Handle Y-axis changes by adjusting X-axis if needed
-          // This would only happen if user directly manipulates Y-axis
-          // Implementation depends on desired behavior - often not needed
         }
+      }
+
+      // Update any existing drawn shapes to maintain their angles
+      if (drawnShapes.length > 0 && chart.annotations) {
+        updateAnnotationAngles(chart);
       }
     } catch (error) {
       console.error('Error handling extremes change:', error);
+    }
+  };
+
+  // Update annotation angles when zooming/panning
+  const updateAnnotationAngles = (chart) => {
+    try {
+      if (!chart.annotations || chart.annotations.length === 0) return;
+      
+      chart.annotations.forEach(annotation => {
+        if (annotation.options.shapes && annotation.options.shapes.length > 0) {
+          // Store the original angle info if it exists
+          const shapeInfo = drawnShapes.find(shape => 
+            shape.id === annotation.options.id);
+          
+          if (shapeInfo && shapeInfo.angle !== undefined) {
+            // Update angle display if it exists
+            const labelEl = document.querySelector(`[data-annotation-id="${annotation.options.id}"]`);
+            if (labelEl) {
+              labelEl.textContent = `${shapeInfo.angle.toFixed(1)}°`;
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error updating annotation angles:', error);
     }
   };
 
@@ -337,11 +322,136 @@ const HighstockTradingViewChart = ({
     }
   };
 
+  // Enhanced chart options to include annotations
+  const getEnhancedChartOptions = (baseOptions) => {
+    // Add or configure annotations
+    baseOptions.annotations = baseOptions.annotations || [];
+    
+    // Add events for annotations
+    baseOptions.chart.events.click = function(e) {
+      if (!drawingEnabled || !currentDrawingTool) return;
+      
+      const chart = this;
+      const xAxis = chart.xAxis[0];
+      const yAxis = chart.yAxis[0];
+      
+      if (!xAxis || !yAxis) return;
+      
+      const x = xAxis.toValue(e.chartX);
+      const y = yAxis.toValue(e.chartY);
+      
+      if (currentDrawingTool === 'line') {
+        // Handle line drawing
+        if (!chart.lineStart) {
+          // First click - store starting point
+          chart.lineStart = { x, y };
+        } else {
+          // Second click - create the line and calculate angle
+          const startPoint = chart.lineStart;
+          const endPoint = { x, y };
+          
+          const annotationId = `line-${Date.now()}`;
+          const angle = calculateAngleBetweenPoints(startPoint, endPoint, priceToBarRatio);
+          
+          chart.addAnnotation({
+            id: annotationId,
+            labels: [{
+              text: `${angle.toFixed(1)}°`,
+              point: { x: endPoint.x, y: endPoint.y },
+              shape: 'rect',
+              style: {
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              },
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              borderColor: 'rgba(0, 0, 0, 0.7)',
+              borderWidth: 0,
+              borderRadius: 3,
+              padding: 5,
+              distance: 15,
+              attrs: {
+                'data-annotation-id': annotationId
+              }
+            }],
+            shapes: [{
+              type: 'path',
+              points: [
+                { x: startPoint.x, y: startPoint.y },
+                { x: endPoint.x, y: endPoint.y }
+              ],
+              strokeWidth: 2,
+              stroke: '#2caffe'
+            }],
+            draggable: true,
+            events: {
+              click: function(e) {
+                // Allow selecting the line for editing/deletion
+                console.log('Line clicked:', this);
+              }
+            }
+          });
+          
+          // Store drawn shape information
+          setDrawnShapes(prev => [...prev, {
+            id: annotationId,
+            type: 'line',
+            startPoint,
+            endPoint,
+            angle
+          }]);
+          
+          // Reset for next line
+          delete chart.lineStart;
+        }
+      }
+    };
+    
+    // Update stock tools options if needed
+    baseOptions.stockTools = {
+      gui: {
+        enabled: true,
+        buttons: ['separator', 'simpleShapes', 'lines', 'crookedLines', 'measure', 'separator', 'verticalLabels', 'flags', 'separator', 'zoomChange', 'fullScreen', 'toggleAnnotations', 'separator', 'currentPriceIndicator', 'saveChart'],
+        definitions: {
+          lines: {
+            items: ['segment', 'arrow', 'ray', 'infinityLine']
+          }
+        }
+      }
+    };
+    
+    // Add navigation module
+    baseOptions.navigation = {
+      annotationsOptions: {
+        shapeOptions: {
+          strokeWidth: 2,
+          stroke: '#2caffe',
+          fill: 'rgba(0, 0, 0, 0.3)',
+          draggable: true
+        },
+        labelOptions: {
+          style: {
+            fontSize: '12px',
+            color: '#ffffff'
+          },
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          borderColor: 'rgba(0, 0, 0, 0.7)',
+          borderWidth: 0,
+          borderRadius: 3,
+          padding: 5
+        }
+      },
+      bindings: {
+        // Define custom bindings
+      }
+    };
+    
+    return baseOptions;
+  };
+
   // Create or update chart when highcharts or data changes
   useEffect(() => {
     if (!chartRef.current || !data || data.length === 0 || !highcharts) return;
-
-    console.log("🔍 DEBUG: Creating chart with data length:", data.length);
     
     try {
       setError(null); // Clear any previous errors
@@ -358,20 +468,11 @@ const HighstockTradingViewChart = ({
         pivotMethod
       });
       
-      // Log the series configuration
-      if (chartOptions.series && chartOptions.series.length > 0) {
-        console.log("Series configuration:", chartOptions.series.map(s => ({
-          type: s.type,
-          id: s.id,
-          name: s.name,
-          dataLength: s.data.length
-        })));
-      }
+      // Enhance options with annotations and drawing tools
+      const enhancedOptions = getEnhancedChartOptions(chartOptions);
       
       // Create the chart
-      const chart = highcharts.stockChart(chartRef.current, chartOptions);
-      
-      console.log("🔍 DEBUG: Chart created successfully");
+      const chart = highcharts.stockChart(chartRef.current, enhancedOptions);
       
       // Store the chart instance for later use
       chartInstanceRef.current = chart;
@@ -380,36 +481,28 @@ const HighstockTradingViewChart = ({
       chart.Highcharts = highcharts;
 
       // Explicitly create pivot points if they're enabled
-      // Add longer delay and additional checking
       if (showPivotPoints) {
-        console.log("🔍 DEBUG: Scheduling pivot points initialization");
         setTimeout(() => {
           try {
             if (chart && chart.Highcharts && typeof chart.Highcharts.createPivotPoints === 'function') {
-              const seriesIds = chart.series.map(s => s.options.id || 'no-id').join(', ');
-              console.log(`Available series IDs: ${seriesIds}`);
-              
-              // Check if price-series exists
-              const mainSeries = chart.get('price-series');
-              if (!mainSeries) {
-                console.warn('price-series not found, will use first series');
-              }
-              
               chart.Highcharts.createPivotPoints(chart, 'price-series', {
                 lookback: pivotLookback,
                 method: pivotMethod
               });
-            } else {
-              console.error("Pivot points creation failed: Required functions not available");
             }
           } catch (err) {
             console.error("Failed to create pivot points:", err);
           }
-        }, 1500); // Give the chart more time to initialize
+        }, 1500);
+      }
+
+      // Add the Stock Tools module if available
+      if (highcharts.StockTools) {
+        highcharts.StockTools.bind(chart);
       }
 
     } catch (error) {
-      console.error('❌ DEBUG: Error creating chart:', error);
+      console.error('Error creating chart:', error);
       setError(`Error creating chart: ${error.message}`);
       
       // Fall back to basic chart
@@ -480,12 +573,6 @@ const HighstockTradingViewChart = ({
             // Calculate bar time length and apply ratio
             const { barTimeLength, barsInView } = calculateBarTimeLength(series, xAxis);
             
-            console.log("🔍 DEBUG: Initial ratio lock calculation:", {
-              barTimeLength,
-              barsInView,
-              xRange
-            });
-            
             // If calculation failed, use visible points
             let effectiveBarsInView = barsInView;
             if (effectiveBarsInView <= 0) {
@@ -499,14 +586,12 @@ const HighstockTradingViewChart = ({
                 const totalRange = allPoints[allPoints.length - 1].x - allPoints[0].x;
                 effectiveBarsInView = (xRange / totalRange) * allPoints.length;
               }
-              
-              console.log("🔍 DEBUG: Using fallback bars in view:", effectiveBarsInView);
             }
             
             effectiveBarsInView = Math.max(1, effectiveBarsInView);
             
             const yRange = priceToBarRatio * effectiveBarsInView;
-        
+    
         // Get actual price values from visible points
         const visiblePoints = series.points.filter(p => p.x >= xAxis.min && p.x <= xAxis.max);
         let minPrice = Infinity, maxPrice = -Infinity;
@@ -518,16 +603,6 @@ const HighstockTradingViewChart = ({
         
         // Use price center from actual data
         const priceCenter = (minPrice + maxPrice) / 2;
-            
-            console.log("Applying price-to-bar ratio lock:", {
-              ratio: priceToBarRatio,
-              barsInView: effectiveBarsInView,
-              xRange,
-              requiredYRange: yRange,
-          priceMin: minPrice,
-          priceMax: maxPrice,
-          priceCenter
-            });
             
             yAxis.setExtremes(
           priceCenter - yRange / 2,
@@ -546,6 +621,19 @@ const HighstockTradingViewChart = ({
           chartInstanceRef.current.ratioLocked = false;
         }
       };
+
+  // Toggle drawing mode
+  const toggleDrawingMode = (tool) => {
+    if (currentDrawingTool === tool) {
+      // Disable drawing if the same tool is clicked
+      setDrawingEnabled(false);
+      setCurrentDrawingTool(null);
+    } else {
+      // Enable drawing with the selected tool
+      setDrawingEnabled(true);
+      setCurrentDrawingTool(tool);
+    }
+  };
 
       // Server-side rendering placeholder
       if (typeof window === 'undefined') {
@@ -590,7 +678,19 @@ const HighstockTradingViewChart = ({
                 {isRatioLocked ? '🔒 Locked' : '🔓 Unlocked'}
               </button>
               <div className="ratio-info">
-            <small>Try values between 0.1 and 10 for best results</small>
+            <small>Try 0.00369 for TradingView-like behavior</small>
+          </div>
+        </div>
+        
+        <div className="drawing-control">
+          <button
+            onClick={() => toggleDrawingMode('line')}
+            className={`drawing-button ${currentDrawingTool === 'line' ? 'active' : ''}`}
+          >
+            📏 Draw Line
+          </button>
+          <div className="drawing-info">
+            <small>Click twice to draw a trend line</small>
           </div>
         </div>
         
@@ -670,7 +770,7 @@ const HighstockTradingViewChart = ({
           gap: 20px;
             }
             
-        .ratio-control, .pivot-control {
+        .ratio-control, .pivot-control, .drawing-control {
               display: flex;
               align-items: center;
               gap: 10px;
@@ -686,7 +786,7 @@ const HighstockTradingViewChart = ({
           width: 80px;
             }
             
-        .ratio-lock-button, .pivot-toggle-button {
+        .ratio-lock-button, .pivot-toggle-button, .drawing-button {
               padding: 8px 12px;
               background-color: #f0f0f0;
               border: 1px solid #ccc;
@@ -708,7 +808,7 @@ const HighstockTradingViewChart = ({
               border-color: #d32f2f;
             }
             
-        .pivot-toggle-button.active {
+        .pivot-toggle-button.active, .drawing-button.active {
           background-color: #2196f3;
           color: white;
           border-color: #0d47a1;
@@ -720,7 +820,7 @@ const HighstockTradingViewChart = ({
           border-color: #424242;
         }
         
-        .ratio-info, .pivot-info {
+        .ratio-info, .pivot-info, .drawing-info {
               margin-top: 4px;
               font-size: 12px;
               color: #666;

@@ -56,24 +56,39 @@ const Description = styled.p`
 `;
 
 // Demo data for fallback when API fails
-const generateDemoData = (count = 100) => {
+const generateDemoData = (count = 100, interval = '1d') => {
   const result = [];
   const today = new Date();
   let basePrice = 150;
   
+  // Determine time increment based on interval
+  let timeIncrement;
+  switch (interval) {
+    case '1m': timeIncrement = 60 * 1000; break;
+    case '5m': timeIncrement = 5 * 60 * 1000; break;
+    case '15m': timeIncrement = 15 * 60 * 1000; break;
+    case '30m': timeIncrement = 30 * 60 * 1000; break;
+    case '1h': timeIncrement = 60 * 60 * 1000; break;
+    case '2h': timeIncrement = 2 * 60 * 60 * 1000; break;
+    case '4h': timeIncrement = 4 * 60 * 60 * 1000; break;
+    case '1wk': timeIncrement = 7 * 24 * 60 * 60 * 1000; break;
+    case '1mo': timeIncrement = 30 * 24 * 60 * 60 * 1000; break;
+    default: timeIncrement = 24 * 60 * 60 * 1000; // 1d is default
+  }
+  
   for (let i = 0; i < count; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - count + i);
-    const timestamp = date.getTime();
+    const timestamp = today.getTime() - (count - i) * timeIncrement;
     
-    // Generate random price movements
-    const change = (Math.random() - 0.5) * 3;
+    // Generate price movements appropriate for the interval
+    // More volatility for longer timeframes
+    const volatility = interval.includes('m') ? 0.01 : (interval === '1d' ? 0.02 : 0.03);
+    const change = (Math.random() - 0.5) * basePrice * volatility;
     const open = basePrice;
     const close = basePrice + change;
     basePrice = close; // Use previous close as next open
     
-    const high = Math.max(open, close) + Math.random() * 1;
-    const low = Math.min(open, close) - Math.random() * 1;
+    const high = Math.max(open, close) + Math.random() * Math.abs(change) * 0.5;
+    const low = Math.min(open, close) - Math.random() * Math.abs(change) * 0.5;
     const volume = Math.floor(Math.random() * 1000000) + 500000;
     
     result.push([
@@ -86,26 +101,31 @@ const generateDemoData = (count = 100) => {
     ]);
   }
   
-  console.log("Generated demo data (first point):", result[0]);
+  console.log(`Generated demo data (${interval}): first point at ${new Date(result[0][0]).toISOString()}`);
   return result;
 };
 
 // Function to fetch stock data from API
 const fetchStockData = async (ticker, interval, range) => {
   try {
-    // Try to use the backend API first
-    const response = await axios.get(`/api/history/${ticker}?interval=${interval}&range=${range}`);
+    console.log(`Fetching data for ${ticker} with interval ${interval} and range ${range}`);
+    
+    // Try to use the backend API 
+    const url = `/api/history/${ticker}?interval=${interval}&range=${range}`;
+    console.log(`API Request URL: ${url}`);
+    
+    const response = await axios.get(url);
     
     if (response.data && Array.isArray(response.data)) {
+      console.log(`Retrieved ${response.data.length} data points for ${ticker} with interval ${interval}`);
       return response.data;
     }
     
     throw new Error('Invalid data format received from API');
   } catch (error) {
-    console.warn(`Error fetching data from API: ${error.message}`);
-    
-    // If the API call fails, return the demo data
-    return generateDemoData(100);
+    // Don't fall back to demo data - propagate the error
+    console.error(`Error fetching data from API: ${error.message}`);
+    throw error; // Throw the error instead of falling back to demo data
   }
 };
 
@@ -120,7 +140,8 @@ const HighstockTradingViewPage = () => {
   // State for ticker input and selection
   const [ticker, setTicker] = useState('AAPL');
   const [interval, setInterval] = useState('1d');
-  const [range, setRange] = useState('1y');
+  // Always use 'max' range
+  const [range] = useState('max');
   const [chartTitle, setChartTitle] = useState('');
 
   // Get the label for the selected interval and range
@@ -128,13 +149,8 @@ const HighstockTradingViewPage = () => {
     const option = INTERVAL_OPTIONS.find(opt => opt.value === value);
     return option ? option.label : value;
   };
-  
-  const getRangeLabel = (value) => {
-    const option = RANGE_OPTIONS.find(opt => opt.value === value);
-    return option ? option.label : value;
-  };
 
-  // Fetch data when the component mounts or when ticker/interval/range changes
+  // Fetch data when the component mounts or when ticker/interval changes
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -158,14 +174,14 @@ const HighstockTradingViewPage = () => {
         }
         
         setChartData(data);
-        setChartTitle(`${ticker} - ${getIntervalLabel(interval)} (${getRangeLabel(range)})`);
+        setChartTitle(`${ticker} - ${getIntervalLabel(interval)} (All Data)`);
       } catch (err) {
         console.error("Error fetching data:", err);
         setError(`Failed to load data: ${err.message}`);
         
         // Use demo data as fallback
         console.log("Using demo data as fallback");
-        const demoData = generateDemoData(100);
+        const demoData = generateDemoData(100, interval);
         console.log("Generated demo data:", {
           length: demoData.length,
           firstPoint: demoData[0],
@@ -243,24 +259,6 @@ const HighstockTradingViewPage = () => {
             </div>
             
             <div className="w-full sm:w-auto">
-              <label htmlFor="range" className="block text-sm font-medium text-gray-700 mb-1">
-                Range
-              </label>
-              <select 
-                id="range" 
-                value={range} 
-                onChange={(e) => setRange(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                {RANGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="w-full sm:w-auto">
               <button 
                 type="submit"
                 className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -293,7 +291,7 @@ const HighstockTradingViewPage = () => {
             <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
               <div className="p-4 border-b border-gray-200">
                 <h2 className="text-xl font-semibold">{chartTitle || `${ticker} Stock Chart`}</h2>
-                <p className="text-sm text-gray-500">{ticker} historical OHLC data</p>
+                <p className="text-sm text-gray-500">{ticker} historical OHLC data (Maximum available range)</p>
               </div>
               
               <HighstockTradingViewChart 
